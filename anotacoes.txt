@@ -1,0 +1,3 @@
+(Largura x Altura): 5.3cm x 6.8cm
+
+# remover planificação da folha

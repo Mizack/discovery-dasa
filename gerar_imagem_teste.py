@@ -17,5 +17,5 @@ pontos = pontos.reshape((-1, 1, 2))
 cv2.fillPoly(image, [pontos], (0, 150, 0))
 
 # Salva a imagem combinada
-cv2.imwrite("imagem_teste.jpg", image)
-print("Imagem de teste 'imagem_teste.jpg' criada com sucesso!")
+cv2.imwrite("imgs/imagem_teste.jpg", image)
+print("Imagem de teste 'imgs/imagem_teste.jpg' criada com sucesso!")
