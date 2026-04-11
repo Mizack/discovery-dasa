@@ -4,7 +4,12 @@ import imutils
 from imutils import contours
 from scipy.spatial import distance as dist
 import sys
-from pyzbar.pyzbar import decode
+try:
+    from pyzbar.pyzbar import decode
+    HAS_PYZBAR = True
+except (ImportError, FileNotFoundError, OSError) as e:
+    HAS_PYZBAR = False
+    print(f"[AVISO] pyzbar nao pode ser carregado. Fallback ativado. Erro: {e}")
 
 # Imports dos nossos módulos personalizados
 from utils_imagem import remover_reflexos_especulares, extrair_metricas_morfologicas, get_dominant_color
@@ -29,15 +34,28 @@ orig = image.copy()
 
 # 2. Leitura de QR Code/Barcode (Rastreabilidade do Paciente)
 print("Buscando identificacao do paciente (QR Code/Barcode)...")
-codigos_barras = decode(image)
 patient_id = "Paciente_Desconhecido"
-for barcode in codigos_barras:
-    patient_id = barcode.data.decode("utf-8")
-    (x, y, w, h) = barcode.rect
-    cv2.rectangle(orig, (x, y), (x + w, y + h), (0, 0, 255), 2)
-    cv2.putText(orig, patient_id, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-    print(f"-> ID Encontrado: {patient_id}")
-    break # Pega o primeiro encontrado
+
+if HAS_PYZBAR:
+    codigos_barras = decode(image)
+    for barcode in codigos_barras:
+        patient_id = barcode.data.decode("utf-8")
+        (x, y, w, h) = barcode.rect
+        cv2.rectangle(orig, (x, y), (x + w, y + h), (0, 0, 255), 2)
+        cv2.putText(orig, patient_id, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        print(f"-> ID Encontrado: {patient_id}")
+        break # Pega o primeiro encontrado
+else:
+    # Fallback usando OpenCV nativo (nao requer DLLs mas so le QR Code, nao Barcode 1D)
+    qrDecoder = cv2.QRCodeDetector()
+    data, bbox, _ = qrDecoder.detectAndDecode(image)
+    if data and len(data) > 0:
+        patient_id = data
+        if bbox is not None:
+            pts = np.array(bbox[0], dtype=np.int32)
+            cv2.polylines(orig, [pts], True, (0, 0, 255), 2)
+            cv2.putText(orig, patient_id, (int(pts[0][0]), int(pts[0][1]) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        print(f"-> ID Encontrado via CV2: {patient_id}")
 
 if patient_id == "Paciente_Desconhecido":
     print("-> Nenhum ID legivel encontrado. Usando ID anonimo.")
