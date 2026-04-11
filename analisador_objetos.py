@@ -13,7 +13,7 @@ def get_dominant_color(image, mask, k=1):
     # Reshape the image to be a list of pixels
     pixels = masked.reshape((masked.shape[0] * masked.shape[1], 3))
     # Remove black pixels (from the background of the mask)
-    pixels = np.array([p for p in pixels if np.any(p)])
+    pixels = pixels[np.any(pixels != [0, 0, 0], axis=1)]
     if len(pixels) == 0:
         return (0, 0, 0)
     # Use KMeans to find the dominant color
@@ -185,12 +185,20 @@ for i, c in enumerate(cnts_w):
     circunferencia_cm = perimetro_px / PX_PER_CM
     area_cm2 = cv2.contourArea(c) / (PX_PER_CM ** 2)
 
+    # Medida ponta a ponta real (Diâmetro de Feret Máximo)
+    sq = np.squeeze(c)
+    max_dist_cm = max(dimA, dimB)
+    if len(sq.shape) == 2:
+        distances = dist.cdist(sq, sq, 'euclidean')
+        max_dist_cm = np.max(distances) / PX_PER_CM
+
     mask = np.zeros(gray_w.shape, dtype="uint8")
     cv2.drawContours(mask, [c], -1, 255, -1)
     r, g, b = get_dominant_color(warped, mask)
 
     print(f"\n--- Objeto Detectado na Folha: {num_objects} ---")
-    print(f"Dimensões (Largura x Altura): {dimB:.2f}cm x {dimA:.2f}cm")
+    print(f"Dimensões Bounding Box (Largura x Altura): {dimB:.2f}cm x {dimA:.2f}cm")
+    print(f"Comprimento Máximo (ponta a ponta): {max_dist_cm:.2f}cm")
     print(f"Circunferência (Perímetro): {circunferencia_cm:.2f}cm")
     print(f"Área: {area_cm2:.2f} cm²")
     print(f"Cor Dominante BGR invertido -> RGB: ({r}, {g}, {b})")
