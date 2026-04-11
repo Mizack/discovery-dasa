@@ -7,7 +7,7 @@ import sys
 from pyzbar.pyzbar import decode
 
 # Imports dos nossos módulos personalizados
-from utils_imagem import remover_reflexos_especulares, extrair_metricas_morfologicas, get_dominant_color
+from utils_imagem import remover_reflexos_especulares, extrair_metricas_morfologicas, get_dominant_color, get_color_name
 from gerador_pdf import gerar_laudo_pdf
 
 def midpoint(ptA, ptB):
@@ -77,21 +77,37 @@ else:
 gray = cv2.cvtColor(image_sem_reflexo, cv2.COLOR_BGR2GRAY)
 gray = cv2.GaussianBlur(gray, (7, 7), 0)
 
-# Aplicar threshold OTSU para separar tecido do fundo
+# Aplicar threshold OTSU em tons de cinza
 _, thresh_inv = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
 _, thresh_norm = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
 
+# Aplicar threshold OTSU no canal de Saturação (ótimo para ignorar sombras pretas/cinzas no fundo)
+hsv = cv2.cvtColor(image_sem_reflexo, cv2.COLOR_BGR2HSV)
+_, s, _ = cv2.split(hsv)
+s = cv2.GaussianBlur(s, (7, 7), 0)
+_, thresh_sat = cv2.threshold(s, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+
 # Morfologia para varrer sujeiras
+kernel = np.ones((5,5), np.uint8)
+thresh_inv = cv2.morphologyEx(thresh_inv, cv2.MORPH_OPEN, kernel)
+thresh_norm = cv2.morphologyEx(thresh_norm, cv2.MORPH_OPEN, kernel)
+thresh_sat = cv2.morphologyEx(thresh_sat, cv2.MORPH_OPEN, kernel)
+
 thresh_inv = cv2.dilate(thresh_inv, None, iterations=3)
 thresh_inv = cv2.erode(thresh_inv, None, iterations=3)
 thresh_norm = cv2.dilate(thresh_norm, None, iterations=3)
 thresh_norm = cv2.erode(thresh_norm, None, iterations=3)
+thresh_sat = cv2.dilate(thresh_sat, None, iterations=3)
+thresh_sat = cv2.erode(thresh_sat, None, iterations=3)
 
 cnts_inv = cv2.findContours(thresh_inv.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 cnts_inv = imutils.grab_contours(cnts_inv)
 
 cnts_norm = cv2.findContours(thresh_norm.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 cnts_norm = imutils.grab_contours(cnts_norm)
+
+cnts_sat = cv2.findContours(thresh_sat.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+cnts_sat = imutils.grab_contours(cnts_sat)
 
 image_area = image.shape[0] * image.shape[1]
 
@@ -102,18 +118,28 @@ def filtrar_contornos(cnts):
         area = cv2.contourArea(c)
         if area >= 500 and area <= (image_area * 0.7):
             validos.append(c)
+    # IMPORTANTE: Ordenar pelo maior primeiro para evitar comparar ruídos
+    validos = sorted(validos, key=cv2.contourArea, reverse=True)
     return validos
 
 cnts_inv_validos = filtrar_contornos(cnts_inv)
 cnts_norm_validos = filtrar_contornos(cnts_norm)
+cnts_sat_validos = filtrar_contornos(cnts_sat)
 
 # Escolhe a abordagem que conseguiu destacar a peca (e nao o fundo)
-# Geralmente a abordagem errada captura um mega bloco do tamanho da tela 
-# ou nenhum bloco se o fundo engolir tudo no RETR_EXTERNAL.
-if len(cnts_norm_validos) > 0 and (len(cnts_inv_validos) == 0 or cv2.contourArea(cnts_norm_validos[0]) > cv2.contourArea(cnts_inv_validos[0])):
-    cnts = cnts_norm_validos
-else:
-    cnts = cnts_inv_validos
+# Priorizamos a Saturação para tecidos úmidos/com cor, pois a sombra tem saturação 0
+todas_as_abordagens = [
+    (cnts_sat_validos, "Saturacao (Anti-Sombra)"),
+    (cnts_norm_validos, "Normal Grayscale"),
+    (cnts_inv_validos, "Inverted Grayscale")
+]
+
+cnts = []
+for abordagem, nome in todas_as_abordagens:
+    if len(abordagem) > 0:
+        cnts = abordagem
+        print(f"-> Utilizando segmentacao por {nome}.")
+        break
 
 if not cnts:
     print("Nenhum objeto detectado apos a calibracao.")
@@ -170,10 +196,11 @@ for i, c in enumerate(cnts):
     
     # Passamos imagem ORIGINAL para extrair a cor real do tecido sem as edições (ou a sem_reflexo)
     r, g, b = get_dominant_color(image, mask)
+    nome_cor = get_color_name(r, g, b)
     
     print(f"\n--- Fragmento Cirurgico {num_objects} ---")
     print(f"Area: {area_cm2:.2f} cm² | Convexidade: {convexity:.2f} | Circularidade: {circularity:.2f}")
-    print(f"Cor (RGB): ({r}, {g}, {b})")
+    print(f"Cor (RGB): ({r}, {g}, {b}) - {nome_cor}")
     
     # Preparar dict para o PDF
     dados_obj = {
@@ -183,7 +210,8 @@ for i, c in enumerate(cnts):
         "area_cm2": area_cm2,
         "circularity": circularity,
         "convexity": convexity,
-        "color": (r, g, b)
+        "color": (r, g, b),
+        "color_name": nome_cor
     }
     objetos_metricas.append(dados_obj)
 
