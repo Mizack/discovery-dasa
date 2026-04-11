@@ -188,7 +188,10 @@ def gerar_laudo_pdf(patient_id, objetos_metricas, caminho_imagem, saida_pdf="lau
         pdf.set_xy(col1_x + 42, y_start)
         pdf.set_font('Helvetica', 'B', 10)
         pdf.set_text_color(40, 40, 40)
-        pdf.cell(40, 6, f"RGB({r}, {g}, {b})")
+        texto_cor = f"RGB({r}, {g}, {b})"
+        if 'color_name' in obj:
+            texto_cor += f" - {obj['color_name']}"
+        pdf.cell(40, 6, texto_cor)
         
         # Avançar pra proxima iteração
         pdf.set_y(y_start + 15)

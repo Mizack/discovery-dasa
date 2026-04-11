@@ -66,3 +66,39 @@ def get_dominant_color(image, mask, k=1):
     dominant = kmeans.cluster_centers_[0].astype(int)
     # BGR para RGB
     return (int(dominant[2]), int(dominant[1]), int(dominant[0]))
+
+def get_color_name(r, g, b):
+    """
+    Retorna o nome da cor mais próxima baseada em um dicionário de cores úteis 
+    (focado também em tons anatômicos/cirúrgicos).
+    """
+    cores = {
+        "Vermelho Escuro": (139, 0, 0),
+        "Vermelho": (255, 0, 0),
+        "Vinho": (114, 47, 55),
+        "Rosa Escuro": (233, 150, 122),
+        "Rosa": (255, 192, 203),
+        "Branco": (255, 255, 255),
+        "Preto": (0, 0, 0),
+        "Cinza Escuro": (105, 105, 105),
+        "Cinza": (128, 128, 128),
+        "Cinza Claro": (211, 211, 211),
+        "Amarelo Pálido": (255, 255, 153),
+        "Marrom Escuro": (101, 67, 33),
+        "Marrom": (150, 75, 0),
+        "Bege": (245, 245, 220),
+        "Roxo Escuro": (48, 25, 52),
+        "Verde (Campo Cirúrgico)": (0, 128, 0),
+        "Azul (Campo Cirúrgico)": (0, 0, 128)
+    }
+    
+    menor_distancia = float('inf')
+    cor_mais_proxima = "Desconhecida"
+    
+    for nome, (cr, cg, cb) in cores.items():
+        distancia = math.sqrt((r - cr)**2 + (g - cg)**2 + (b - cb)**2)
+        if distancia < menor_distancia:
+            menor_distancia = distancia
+            cor_mais_proxima = nome
+            
+    return cor_mais_proxima
