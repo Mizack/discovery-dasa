@@ -2,3 +2,6 @@ opencv-python
 numpy
 scikit-learn
 imutils
+scipy
+pyzbar
+fpdf
