@@ -1,0 +1,111 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "PathoScan API (Analisador Macroscópico)",
+    "description": "API em Serverless Chalice para a análise de peças cirúrgicas e histológicas, extraindo tamanhos via ArUco e gerando laudos.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8000",
+      "description": "Servidor Local"
+    }
+  ],
+  "paths": {
+    "/analisar": {
+      "post": {
+        "summary": "Analisa uma peça cirúrgica enviada via Base64",
+        "description": "Recebe uma imagem (Base64), calibra o escalonamento via marcador ArUco, extrai margens e cor dominante, e retorna o laudo finalizando em PDF.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "description": "Imagem codificada em Base64 (com ou sem o prefixo 'data:image/...;base64,')"
+                  },
+                  "filename": {
+                    "type": "string",
+                    "description": "Opcional: O nome original do arquivo."
+                  }
+                },
+                "required": ["image"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Análise concluída com sucesso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "image_url": { "type": "string" },
+                    "pdf_url": { "type": "string" },
+                    "logs": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Nenhuma imagem enviada ou Base64 inválida."
+          },
+          "500": {
+            "description": "Erro de processamento interno ou objeto/ArUco não detectados."
+          }
+        }
+      }
+    },
+    "/imgs/{filename}": {
+      "get": {
+        "summary": "Recupera uma imagem analisada",
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Imagem JPEG retornada",
+            "content": {
+              "image/jpeg": { "schema": { "type": "string", "format": "binary" } }
+            }
+          },
+          "404": { "description": "Imagem não encontrada" }
+        }
+      }
+    },
+    "/pdf/{filename}": {
+      "get": {
+        "summary": "Recupera um Laudo em PDF",
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Documento PDF retornado",
+            "content": {
+              "application/pdf": { "schema": { "type": "string", "format": "binary" } }
+            }
+          },
+          "404": { "description": "Laudo não encontrado" }
+        }
+      }
+    }
+  }
+}

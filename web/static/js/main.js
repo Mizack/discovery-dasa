@@ -68,15 +68,23 @@ document.addEventListener('DOMContentLoaded', () => {
         uploadContainer.classList.add('hidden');
         loadingState.classList.remove('hidden');
         
-        const formData = new FormData();
-        formData.append('image', file);
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = function() {
+            const base64Data = reader.result;
 
-        // Envío AJAX
-        fetch('/analisar', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json().then(data => ({status: response.status, body: data})))
+            // Envío AJAX
+            fetch('http://127.0.0.1:8000/analisar', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    image: base64Data,
+                    filename: file.name
+                })
+            })
+            .then(response => response.json().then(data => ({status: response.status, body: data})))
         .then(res => {
             loadingState.classList.add('hidden');
             
@@ -116,5 +124,6 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Falha na comunicação com o servidor.');
             console.error(err);
         });
+        };
     }
 });
